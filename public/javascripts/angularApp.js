@@ -46,7 +46,7 @@ function($stateProvider, $urlRouterProvider) {
 });
   $urlRouterProvider.otherwise('home');
 }]);
-app.factory('posts', ['$http',function($http){
+app.factory('posts', ['$http','auth',function($http,auth){
   // service body
   var o = {
     posts: [ {title: 'post 1', link:'',upvotes: 5}]
@@ -56,16 +56,19 @@ app.factory('posts', ['$http',function($http){
       angular.copy(data, o.posts);
     });
   };
-  o.create = function(post) {
-  return $http.post('/posts', post).success(function(data){
+ o.create = function(post) {
+  return $http.post('/posts', post, {
+    headers: {Authorization: 'Bearer '+auth.getToken()}
+  }).success(function(data){
     o.posts.push(data);
   });
 };
 o.upvote = function(post) {
-  return $http.put('/posts/' + post._id + '/upvote')
-    .success(function(data){
-      post.upvotes += 1;
-    });
+  return $http.put('/posts/' + post._id + '/upvote', null, {
+    headers: {Authorization: 'Bearer '+auth.getToken()}
+  }).success(function(data){
+    post.upvotes += 1;
+  });
 };
 o.get = function(id) {
   return $http.get('/posts/' + id).then(function(res){
@@ -74,14 +77,18 @@ o.get = function(id) {
 };
 
 o.addComment = function(id, comment) {
-  return $http.post('/posts/' + id + '/comments', comment);
+  return $http.post('/posts/' + id + '/comments', comment, {
+    headers: {Authorization: 'Bearer '+auth.getToken()}
+  });
 };
 
+
 o.upvoteComment = function(post, comment) {
-  return $http.put('/posts/' + post._id + '/comments/'+ comment._id + '/upvote')
-    .success(function(data){
-      comment.upvotes += 1;
-    });
+  return $http.put('/posts/' + post._id + '/comments/'+ comment._id + '/upvote', null, {
+    headers: {Authorization: 'Bearer '+auth.getToken()}
+  }).success(function(data){
+    comment.upvotes += 1;
+  });
 };
   return o;
 
@@ -161,8 +168,10 @@ app.controller('PostsCtrl', [
 '$scope',
 'posts',
 'post',
-function($scope, posts,post){
+'auth',
+function($scope, posts,post,auth){
   $scope.post = post
+  $scope.isLoggedIn = auth.isLoggedIn;
 $scope.addComment = function(){
   if($scope.body === '') { return; }
   posts.addComment(post._id, {
@@ -176,6 +185,39 @@ $scope.addComment = function(){
 $scope.incrementUpvotes = function(comment){
   posts.upvoteComment(post, comment);
 };
+}]);
+
+app.controller('NavCtrl', [
+'$scope',
+'auth',
+function($scope, auth){
+  $scope.isLoggedIn = auth.isLoggedIn;
+  $scope.currentUser = auth.currentUser;
+  $scope.logOut = auth.logOut;
+}]);
+
+app.controller('AuthCtrl', [
+'$scope',
+'$state',
+'auth',
+function($scope, $state, auth){
+  $scope.user = {};
+
+  $scope.register = function(){
+    auth.register($scope.user).error(function(error){
+      $scope.error = error;
+    }).then(function(){
+      $state.go('home');
+    });
+  };
+
+  $scope.logIn = function(){
+    auth.logIn($scope.user).error(function(error){
+      $scope.error = error;
+    }).then(function(){
+      $state.go('home');
+    });
+  };
 }]);
 
 
